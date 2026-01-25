@@ -1,9 +1,7 @@
-// lib/screens/main_app_scaffold.dart (NİHAİ KOD - BEYAZ ALT İKONLAR)
-
 import 'package:flutter/material.dart';
-import 'dashboard_content.dart'; 
-import 'route_content.dart';     
-import 'news_content.dart';     
+import 'dashboard_content.dart';
+import 'route_planner_screen.dart';
+import 'news_content.dart'; 
 import '../widgets/app_drawer.dart';
 
 class MainAppScaffold extends StatefulWidget {
@@ -14,87 +12,89 @@ class MainAppScaffold extends StatefulWidget {
 }
 
 class _MainAppScaffoldState extends State<MainAppScaffold> {
-  int _selectedIndex = 0; 
-  
+  int _selectedIndex = 0;
+
   final List<Widget> _screenContents = const [
-    DashboardContent(),
-    RouteContent(),
-    NewsContent(),
+    DashboardContent(),      // 0: Ana Sayfa
+    RoutePlannerScreen(),    // 1: AI Rota
+    NewsContent(),           // 2: Haberler
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        
-        // KATMAN 1: Arkaplan Görseli
+        // 1. KATMAN: Arkaplan Resmi
         Positioned.fill(
-          child: Opacity(
-            opacity: 0.6, 
-            child: Image.asset(
-              'assets/images/background.jpg',
-              fit: BoxFit.cover, 
-            ),
+          child: Image.asset(
+            'assets/images/background.jpg', 
+            fit: BoxFit.cover,
+            height: double.infinity,
+            width: double.infinity,
+            errorBuilder: (c, e, s) => Container(color: const Color(0xFF121212)),
           ),
         ),
 
-        // KATMAN 2: Şeffaf Scaffold
-        Scaffold(
-          backgroundColor: Colors.transparent, 
-          extendBodyBehindAppBar: true, 
-          extendBody: true, 
-
-          appBar: AppBar(
-            title: const Text('Erzurum Akıllı Şehir'),
-            centerTitle: true,
-            leading: Builder( 
-              builder: (context) {
-                return IconButton(
-                  // Bu ikon temadan (main.dart) SİYAH geliyor, bu doğru.
-                  icon: const Icon(Icons.menu), 
-                  onPressed: () {
-                    Scaffold.of(context).openDrawer(); 
-                  },
-                );
-              },
-            ),
-            actions: const [], 
+        // ✨ YENİ KATMAN: KARARTMA PERDESİ (Güneş Gözlüğü) 😎
+        // Resim ne kadar beyaz olursa olsun, yazıların okunmasını sağlar.
+        Positioned.fill(
+          child: Container(
+            color: Colors.black.withOpacity(0.5), // %50 Karartma (İstersen 0.4 veya 0.6 yap)
           ),
-          drawer: const AppDrawer(), 
+        ),
+
+        // 3. KATMAN: Uygulama İskeleti
+        Scaffold(
+          backgroundColor: Colors.transparent, // Scaffold şeffaf
+          extendBody: true, // İçerik alta kadar uzanır
           
+          drawer: const AppDrawer(), // Yan Menü
+
+          // APP BAR
+          appBar: AppBar(
+            title: const Text('Erzurum Akıllı Şehir', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            centerTitle: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          
+          // EKRAN İÇERİĞİ
           body: _screenContents[_selectedIndex],
 
-          // ALT MENÜ RENKLERİ GÜNCELLENDİ
-          bottomNavigationBar: BottomNavigationBar(
-            backgroundColor: Colors.transparent, 
-            elevation: 0, 
-            
-            // TEMAYI EZİYOR VE BEYAZ YAPIYORUZ:
-            selectedItemColor: Colors.white, // <--- SEÇİLİ İKON BEYAZ
-            unselectedItemColor: Colors.white70, // <--- DİĞER İKONLAR SOLUK BEYAZ
-            
-            items: const <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home), 
-                label: 'Ana Sayfa',
+          // ALT MENÜ
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Colors.black.withOpacity(0.9), // En alt koyu
+                  Colors.black.withOpacity(0.5), 
+                  Colors.transparent,            // Üstü şeffaf
+                ],
+                stops: const [0.0, 0.4, 1.0],
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.psychology), 
-                label: 'AI Rota',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.article), 
-                label: 'Haberler',
-              ),
-            ],
-            currentIndex: _selectedIndex,
-            onTap: _onItemTapped,
+            ),
+            child: BottomNavigationBar(
+              backgroundColor: Colors.transparent, 
+              elevation: 0, 
+              selectedItemColor: Colors.white, 
+              unselectedItemColor: Colors.white60, 
+              currentIndex: _selectedIndex,
+              onTap: _onItemTapped,
+              type: BottomNavigationBarType.fixed,
+              showUnselectedLabels: true,
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Ana Sayfa'),
+                BottomNavigationBarItem(icon: Icon(Icons.psychology), label: 'AI Rota'),
+                BottomNavigationBarItem(icon: Icon(Icons.article), label: 'Haberler'),
+              ],
+            ),
           ),
         ),
       ],

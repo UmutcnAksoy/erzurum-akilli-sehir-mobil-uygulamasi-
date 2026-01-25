@@ -1,12 +1,10 @@
-// lib/models/module_item.dart (NİHAİ KOD)
-
 import 'package:flutter/material.dart';
 
 class ModuleItem {
   final String title;
   final IconData icon;
   final Color color;
-  final String routeName; 
+  final String routeName; // Modülün gideceği sayfanın yolu (path)
 
   const ModuleItem({
     required this.title,
@@ -18,11 +16,18 @@ class ModuleItem {
 
 // Siyah-Beyaz temaya uygun Gri ikonlar
 const List<ModuleItem> allModules = [
+  // KRİTİK GÜNCELLEME: Şehir Rehberi en başta
+  ModuleItem(
+    title: "Şehir Rehberi", 
+    icon: Icons.map, 
+    color: Colors.grey, 
+    routeName: "/city_guide", // Yeni rota
+  ),
   ModuleItem(
     title: "Kültür & Tarihi Mekan", 
     icon: Icons.museum, 
     color: Colors.grey, // Siyah/Beyaz Tema
-    routeName: "/culture",
+    routeName: "/culture", // Gezilecekyerler koleksiyonunu gösterecek
   ),
   ModuleItem(
     title: "Kafe & Restoran", 

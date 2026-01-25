@@ -1,6 +1,6 @@
-// lib/screens/route_content.dart (NİHAİ KOD - DİREKT SOHBET EKRANI)
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class RouteContent extends StatefulWidget {
   const RouteContent({super.key});
@@ -11,7 +11,11 @@ class RouteContent extends StatefulWidget {
 
 class _RouteContentState extends State<RouteContent> {
   final TextEditingController _textController = TextEditingController();
-  final List<Map<String, dynamic>> _messages = []; // Mesajları ve kimden geldiğini tutar
+  final List<Map<String, dynamic>> _messages = []; // Mesajları tutan liste
+  bool _isLoading = false; // Yükleniyor durumu
+
+  // Backend Adresi (Emülatör için 10.0.2.2, Gerçek Cihaz için bilgisayarının IP'si)
+  final String backendUrl = "http://10.0.2.2:8000/chat"; 
 
   @override
   void initState() {
@@ -25,48 +29,84 @@ class _RouteContentState extends State<RouteContent> {
     });
   }
 
-  void _handleSendPressed(String text) {
+  Future<void> _handleSendPressed(String text) async {
     if (text.isEmpty) return;
     _textController.clear();
     
+    // 1. Kullanıcı mesajını ekrana ekle
     setState(() {
-      _messages.add({"message": text, "isUser": true}); // Kullanıcı mesajını ekle
+      _messages.add({"message": text, "isUser": true});
+      _isLoading = true; // Yükleniyor göstergesini aç
     });
 
-    // TODO: AI Backend'e API çağrısı burada yapılacak
-    // Simülasyon: AI'dan sahte bir cevap al
-    Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {
-        _messages.add({
-          "message": "İsteğini aldım: '$text'. Hemen senin için en iyi rotayı hazırlıyorum...",
-          "isUser": false,
+    try {
+      // 2. Backend'e istek at
+      final response = await http.post(
+        Uri.parse(backendUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"mesaj": text}),
+      );
+
+      if (response.statusCode == 200) {
+        // 3. Başarılı cevap geldiyse işle
+        final data = jsonDecode(utf8.decode(response.bodyBytes)); // Türkçe karakter düzeltmesi
+        final String aiResponse = data['cevap'];
+
+        if (mounted) {
+          setState(() {
+            _messages.add({
+              "message": aiResponse,
+              "isUser": false,
+            });
+          });
+        }
+      } else {
+        // Sunucu hatası
+        if (mounted) {
+          setState(() {
+            _messages.add({
+              "message": "Sunucuya ulaşılamadı. Hata kodu: ${response.statusCode}",
+              "isUser": false,
+            });
+          });
+        }
+      }
+    } catch (e) {
+      // Bağlantı hatası
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            "message": "Bağlantı hatası: $e. Backend çalışıyor mu?",
+            "isUser": false,
+          });
         });
-      });
-    });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Yükleniyor göstergesini kapat
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Ekranın üst ve alt boşluklarını hesapla
     final double statusBarHeight = MediaQuery.of(context).padding.top;
     final double appBarHeight = kToolbarHeight;
     final double bottomNavHeight = kBottomNavigationBarHeight;
 
-    // Bu ekran artık bir 'Column' (dikey)
-    // 1. (Expanded) Mesaj listesi
-    // 2. (Container) Yazı yazma çubuğu
     return Padding(
-      padding: EdgeInsets.only(top: statusBarHeight + appBarHeight), // Sadece üstten boşluk
+      padding: EdgeInsets.only(top: statusBarHeight + appBarHeight), 
       child: Column(
         children: [
-          // --- 1. MESAJ LİSTESİ ---
+          // --- MESAJ LİSTESİ ---
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               reverse: true, // Listeyi aşağıdan yukarıya doğru tutar
               itemCount: _messages.length,
               itemBuilder: (context, index) {
-                // Listeyi tersten okuduğumuz için
                 final messageData = _messages[_messages.length - 1 - index];
                 return _ChatMessageBubble(
                   message: messageData["message"],
@@ -76,51 +116,53 @@ class _RouteContentState extends State<RouteContent> {
             ),
           ),
           
-          // --- 2. YAZI YAZMA ÇUBUĞU ---
+          // --- YÜKLENİYOR GÖSTERGESİ ---
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+
+          // --- YAZI YAZMA ÇUBUĞU ---
           _buildTextInputArea(context, bottomNavHeight),
         ],
       ),
     );
   }
 
-  // Alttaki mesaj yazma çubuğu (Arkaplan fotoğrafına uygun)
   Widget _buildTextInputArea(BuildContext context, double bottomNavHeight) {
     return Container(
-      // Padding, alt menünün ve telefonun alt çubuğunun üstünde kalması için
       padding: EdgeInsets.only(
         bottom: bottomNavHeight + MediaQuery.of(context).padding.bottom + 10,
         left: 16,
         right: 16,
         top: 10,
       ),
-      // Bu container'ın kendisi şeffaf
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _textController,
-              style: const TextStyle(color: Colors.white), // Yazı rengi beyaz
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: "Bir rota iste...",
-                hintStyle: const TextStyle(color: Colors.white70), // Hint (ipucu) beyaz
+                hintStyle: const TextStyle(color: Colors.white70),
                 filled: true,
-                // Yarı-şeffaf siyah dolgu
-                fillColor: Colors.black.withOpacity(0.5), 
+                fillColor: Colors.black.withOpacity(0.6), 
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none, // Kenarlık yok
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-              onSubmitted: _handleSendPressed, // Enter'a basınca gönder
+              onSubmitted: _handleSendPressed,
             ),
           ),
           const SizedBox(width: 8),
-          // Gönder Butonu
           FloatingActionButton(
             mini: true,
-            backgroundColor: Colors.white, // Beyaz buton
-            child: const Icon(Icons.send, color: Colors.black), // Siyah ikon
+            backgroundColor: Colors.white,
+            child: const Icon(Icons.send, color: Colors.black),
             onPressed: () => _handleSendPressed(_textController.text),
           ),
         ],
@@ -129,7 +171,6 @@ class _RouteContentState extends State<RouteContent> {
   }
 }
 
-// Sohbet Baloncuğu (Arkaplan fotoğrafına uygun)
 class _ChatMessageBubble extends StatelessWidget {
   final String message;
   final bool isUserMessage;
@@ -145,14 +186,18 @@ class _ChatMessageBubble extends StatelessWidget {
       alignment: isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6.0),
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
-          // Kullanıcı: Yarı-şeffaf beyaz
-          // AI: Yarı-şeffaf siyah (Hava durumu kartı gibi)
           color: isUserMessage
               ? Colors.white.withOpacity(0.9)
-              : Colors.black.withOpacity(0.6),
-          borderRadius: BorderRadius.circular(15),
+              : Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: isUserMessage ? const Radius.circular(20) : const Radius.circular(0),
+            bottomRight: isUserMessage ? const Radius.circular(0) : const Radius.circular(20),
+          ),
           border: !isUserMessage
               ? Border.all(color: Colors.white.withOpacity(0.2), width: 1)
               : null,
@@ -160,8 +205,8 @@ class _ChatMessageBubble extends StatelessWidget {
         child: Text(
           message,
           style: TextStyle(
-            // Yazı renkleri arkaplanla kontrast olmalı
             color: isUserMessage ? Colors.black : Colors.white,
+            fontSize: 15,
           ),
         ),
       ),

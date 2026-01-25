@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1012376722580",
+    "project_id": "erzurum-atlasi",
+    "storage_bucket": "erzurum-atlasi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1012376722580:android:d573da92dbae701b4d2881",
+        "android_client_info": {
+          "package_name": "com.example.erzurum_akilli_sehir_uygulamasi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuxOXM0xGQ0THwVnZ5v0NQmvsFAdG_hiw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
