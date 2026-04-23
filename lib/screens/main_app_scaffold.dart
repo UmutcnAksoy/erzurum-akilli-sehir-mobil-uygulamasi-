@@ -15,9 +15,9 @@ class _MainAppScaffoldState extends State<MainAppScaffold> {
   int _selectedIndex = 0;
 
   final List<Widget> _screenContents = const [
-    DashboardContent(),      // 0: Ana Sayfa
-    RoutePlannerScreen(),    // 1: AI Rota
-    NewsContent(),           // 2: Haberler
+    DashboardContent(),
+    RoutePlannerScreen(),
+    NewsContent(),
   ];
 
   void _onItemTapped(int index) {
@@ -31,68 +31,76 @@ class _MainAppScaffoldState extends State<MainAppScaffold> {
         // 1. KATMAN: Arkaplan Resmi
         Positioned.fill(
           child: Image.asset(
-            'assets/images/background.jpg', 
+            'assets/images/background.jpg',
             fit: BoxFit.cover,
             height: double.infinity,
             width: double.infinity,
-            errorBuilder: (c, e, s) => Container(color: const Color(0xFF121212)),
+            errorBuilder: (c, e, s) =>
+                Container(color: const Color(0xFF121212)),
           ),
         ),
 
-        // ✨ YENİ KATMAN: KARARTMA PERDESİ (Güneş Gözlüğü) 😎
-        // Resim ne kadar beyaz olursa olsun, yazıların okunmasını sağlar.
+        // 2. KATMAN: Karartma Perdesi
         Positioned.fill(
           child: Container(
-            color: Colors.black.withOpacity(0.5), // %50 Karartma (İstersen 0.4 veya 0.6 yap)
+            color: Colors.black.withOpacity(0.35),
           ),
         ),
 
         // 3. KATMAN: Uygulama İskeleti
         Scaffold(
-          backgroundColor: Colors.transparent, // Scaffold şeffaf
-          extendBody: true, // İçerik alta kadar uzanır
-          
-          drawer: const AppDrawer(), // Yan Menü
-
-          // APP BAR
+          backgroundColor: Colors.transparent,
+          extendBody: true,
+          drawer: const AppDrawer(),
           appBar: AppBar(
-            title: const Text('Erzurum Akıllı Şehir', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Erzurum Atlası',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             centerTitle: true,
             backgroundColor: Colors.transparent,
             elevation: 0,
             iconTheme: const IconThemeData(color: Colors.white),
           ),
-          
-          // EKRAN İÇERİĞİ
           body: _screenContents[_selectedIndex],
-
-          // ALT MENÜ
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
                 colors: [
-                  Colors.black.withOpacity(0.9), // En alt koyu
-                  Colors.black.withOpacity(0.5), 
-                  Colors.transparent,            // Üstü şeffaf
+                  Colors.black.withOpacity(0.9),
+                  Colors.black.withOpacity(0.5),
+                  Colors.transparent,
                 ],
                 stops: const [0.0, 0.4, 1.0],
               ),
             ),
             child: BottomNavigationBar(
-              backgroundColor: Colors.transparent, 
-              elevation: 0, 
-              selectedItemColor: Colors.white, 
-              unselectedItemColor: Colors.white60, 
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              selectedItemColor: Colors.white,
+              unselectedItemColor: Colors.white60,
               currentIndex: _selectedIndex,
               onTap: _onItemTapped,
               type: BottomNavigationBarType.fixed,
               showUnselectedLabels: true,
               items: const [
-                BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Ana Sayfa'),
-                BottomNavigationBarItem(icon: Icon(Icons.psychology), label: 'AI Rota'),
-                BottomNavigationBarItem(icon: Icon(Icons.article), label: 'Haberler'),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Ana Sayfa',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.psychology),
+                  label: 'AI Rota',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.article),
+                  label: 'Haberler',
+                ),
               ],
             ),
           ),

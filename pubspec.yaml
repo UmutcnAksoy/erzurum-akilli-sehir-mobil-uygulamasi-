@@ -6,42 +6,59 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  # Minimum SDK 3.0.0'a geri çekildi (Çakışma riskini azaltmak için)
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # Backend ve Veri Tabanı (Yaygın Uyumlu Versiyonlar)
+  # Backend
   firebase_core: ^2.24.2
-  cloud_firestore: ^4.14.0
+  cloud_firestore: ^4.17.5
   
-  # Yardımcı Paketler
-  http: ^1.2.0 
+  # Araçlar
+  http: ^1.6.0 
   intl: ^0.19.0 
-  url_launcher: ^6.2.4
+  url_launcher: ^6.3.2
 
-  # UI, İkonlar ve Fontlar (Uyumlu Versiyonlar)
+  # UI
   cupertino_icons: ^1.0.8
-  flex_color_scheme: ^8.2.0 # Senin son gönderdiğin versiyonu koruduk
-  google_fonts: ^6.3.2
-  lucide_icons: ^0.257.0 # Senin son gönderdiğin versiyonu koruduk
-  
-  # Medya Oynatıcı
-  youtube_player_flutter: ^9.1.3 # Senin son gönderdiğin versiyonu koruduk
+  flex_color_scheme: ^8.2.0 
+  google_fonts: ^6.3.0
+  lucide_icons: ^0.257.0 
+  youtube_player_flutter: ^9.1.3 
+  geolocator: ^14.0.2
+  flutter_tts: ^4.2.5
+  video_player: ^2.10.1
+  firebase_remote_config: ^4.4.7
+  share_plus: ^12.0.2
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0 # Senin son gönderdiğin versiyonu koruduk
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app_logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0a1628"
+  adaptive_icon_foreground: "assets/images/app_logo.png"
+
+flutter_native_splash:
+  color: "#0a1628"
+  background_image: assets/images/splash.png
+  android: true
+  ios: true
+  fullscreen: true
 
 flutter:
   uses-material-design: true
 
-  # Assetler (Görseller)
   assets:
-    # Ana arka plan görseli
-    - assets/images/background.jpg
-    # KRİTİK: Üniversite logoları ve diğer görseller için klasörü tamamen ekliyoruz
     - assets/images/
+    - assets/videos/

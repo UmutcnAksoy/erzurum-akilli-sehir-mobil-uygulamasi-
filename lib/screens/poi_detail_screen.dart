@@ -1,166 +1,152 @@
 import 'package:flutter/material.dart';
-import '../models/poi_model.dart'; 
 import 'package:lucide_icons/lucide_icons.dart';
+import '../models/poi_model.dart';
 
-// Bu ekran, listeden seçilen tek bir POI'nin tüm detaylarını gösterir.
 class POIDetailScreen extends StatelessWidget {
-  // Seçilen POI'nin tüm verisini bu model üzerinden alıyoruz.
   final POIModel poi;
-  
+
   const POIDetailScreen({super.key, required this.poi});
 
   @override
   Widget build(BuildContext context) {
-    // Scaffold'u transparan yapıyoruz ki, altındaki ana görsel/gradient görünsün.
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true, 
-      
-      appBar: AppBar(
-        title: Text(
-          poi.ad,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.transparent, // AppBar'ı şeffaf yapıyoruz
-        elevation: 0,
-      ),
-      
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Resim Alanı (Üstte büyük resim)
-            Container(
-              height: 300,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                // Resim URL'si boşsa Placeholder kullan
-                image: DecorationImage(
-                  image: NetworkImage(
-                    poi.resimUrlsi.isNotEmpty 
-                      ? poi.resimUrlsi 
-                      : 'https://placehold.co/600x300/333/fff?text=${poi.ad}',
-                  ),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                    Colors.black.withOpacity(0.4), 
-                    BlendMode.darken,
-                  ),
+      backgroundColor: Colors.black,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 280.0,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+            flexibleSpace: FlexibleSpaceBar(
+              title: Text(
+                poi.ad,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 10)],
                 ),
               ),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    poi.ad,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      shadows: [Shadow(blurRadius: 10, color: Colors.black)],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            
-            // Detay Kartı (Şeffaf arkaplan üzerinde)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Container(
-                padding: const EdgeInsets.all(20.0),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7), // Koyu şeffaf kart
-                  borderRadius: BorderRadius.circular(20.0),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Açıklama
-                    const Text(
-                      "Açıklama",
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const Divider(color: Colors.white24, height: 20),
-                    Text(
-                      poi.aciklama,
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Kriterler: İlçe, Süre, Puan
-                    Wrap(
-                      spacing: 12.0,
-                      runSpacing: 12.0,
-                      children: [
-                        _buildDetailChip(LucideIcons.mapPin, poi.ilce),
-                        _buildDetailChip(LucideIcons.clock, '${poi.ortalamaSure} dk'),
-                        _buildDetailChip(LucideIcons.star, poi.puanOrtalamasi.toStringAsFixed(1), Colors.amber),
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-                    
-                    // Adres ve Harita Butonu
-                    const Text(
-                      "Adres Detayları",
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const Divider(color: Colors.white24, height: 20),
-                    Text(
-                      poi.adres.isNotEmpty ? poi.adres : 'Adres bilgisi mevcut değil.',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 20),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // BURAYA HARİTA/NAVİGASYON API ENTEGRASYONU GELECEK
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Harita navigasyonu başlatılıyor...')),
-                          );
-                        },
-                        icon: const Icon(LucideIcons.map),
-                        label: const Text('Haritada Göster & Navigasyon Başlat'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          backgroundColor: const Color(0xFF2C5364), // Temaya uygun vurgu rengi
-                          foregroundColor: Colors.white,
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  poi.resimUrlsi.isNotEmpty
+                      ? Image.network(
+                          poi.resimUrlsi,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            color: Colors.grey[900],
+                            child: const Icon(LucideIcons.imageOff,
+                                color: Colors.white54, size: 50),
+                          ),
+                        )
+                      : Container(
+                          color: Colors.grey[900],
+                          child: const Icon(LucideIcons.imageOff,
+                              color: Colors.white54, size: 50),
                         ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black87],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ADRES BLOĞU
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(LucideIcons.mapPin,
+                                color: Colors.redAccent, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              "Açık Adres",
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          poi.adres,
+                          style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              height: 1.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // PUAN, SÜRE VE YORUM
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _buildInfoChip(LucideIcons.clock,
+                          "${poi.ortalamaSure} dk", Colors.white70),
+                      _buildInfoChip(Icons.star,
+                          poi.puanOrtalamasi.toStringAsFixed(1), Colors.amber),
+                      _buildInfoChip(LucideIcons.messagesSquare,
+                          "${poi.yorumSayisi} Yorum", Colors.white70),
+                    ],
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // Yardımcı Widget: Kriterleri gösteren küçük çip
-  Widget _buildDetailChip(IconData icon, String text, [Color iconColor = Colors.white70]) {
+  Widget _buildInfoChip(IconData icon, String label, Color iconColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: iconColor),
-          const SizedBox(width: 6),
+          Icon(icon, color: iconColor, size: 16),
+          const SizedBox(width: 8),
           Text(
-            text,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+            label,
+            style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13),
           ),
         ],
       ),

@@ -13,186 +13,258 @@ class FoodPoiScreen extends StatefulWidget {
 
 class _FoodPoiScreenState extends State<FoodPoiScreen> {
   String _searchQuery = '';
-  final String _selectedIlce = 'Tümü';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, 
+      backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("Kafe & Restoranlar", style: TextStyle(color: Colors.white)),
+        title: const Text("Kafe & Restoranlar",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Container(
-        decoration: const BoxDecoration(color: Colors.black), 
-        child: Column(
-          children: [
-            // --- ARAMA ÇUBUĞU ---
-            Padding(
-              padding: const EdgeInsets.only(top: 100, left: 16.0, right: 16.0, bottom: 16.0),
-              child: TextField(
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value.toLowerCase();
-                  });
-                },
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Mekânlarda Ara...',
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const Icon(LucideIcons.search, color: Colors.white70),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  filled: true,
-                  fillColor: Colors.grey[900],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: BorderSide.none,
-                  ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(
+                top: 100, left: 16.0, right: 16.0, bottom: 16.0),
+            child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Mekânlarda Ara...',
+                hintStyle: const TextStyle(color: Colors.white54),
+                prefixIcon:
+                    const Icon(LucideIcons.search, color: Colors.white70),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                filled: true,
+                fillColor: Colors.grey[900],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
-
-            // --- LİSTE ALANI ---
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                // DİKKAT: Koleksiyon adı 'food_places' olarak düzeltildi!
-                stream: FirebaseFirestore.instance
-                    .collection('food_places') 
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  // 1. Hata Durumu
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Hata: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-                  }
-
-                  // 2. Yükleniyor Durumu
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
-                  }
-
-                  // 3. Veri Yok Durumu
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'Henüz hiç mekan yok.\nFirebase "food_places" koleksiyonu boş görünüyor.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white54),
-                      ),
-                    );
-                  }
-
-                  // Verileri Modele Çevirme
-                  final List<POIModel> pois = snapshot.data!.docs
-                      .map((doc) => POIModel.fromFirestore(doc))
-                      .toList();
-
-                  // Arama Filtreleme
-                  final filteredPois = pois.where((poi) {
-                    final matchesSearch = poi.ad.toLowerCase().contains(_searchQuery);
-                    return matchesSearch;
-                  }).toList();
-
-                  // Filtre Sonucu Boşsa
-                  if (filteredPois.isEmpty) {
-                    return const Center(child: Text("Aradığınız kriterde mekan bulunamadı.", style: TextStyle(color: Colors.white54)));
-                  }
-
-                  // Listeyi Çizdirme
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    itemCount: filteredPois.length,
-                    itemBuilder: (context, index) {
-                      final poi = filteredPois[index];
-                      return GestureDetector(
-                        onTap: () {
-                           Navigator.of(context).push(
-                             MaterialPageRoute(
-                               builder: (context) => POIDetailScreen(poi: poi),
-                             ),
-                           );
-                        },
-                        child: _PoiCard(poi: poi),
-                      );
-                    },
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('food_places')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                      child: Text('Hata: ${snapshot.error}',
+                          style: const TextStyle(color: Colors.red)));
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: CircularProgressIndicator(
+                          color: Colors.blueAccent));
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'Henüz hiç mekan yok.',
+                      style: TextStyle(color: Colors.white54),
+                    ),
                   );
-                },
-              ),
+                }
+
+                final List<POIModel> pois = snapshot.data!.docs
+                    .map((doc) => POIModel.fromFirestore(doc))
+                    .toList();
+
+                final filteredPois = pois
+                    .where((poi) =>
+                        poi.ad.toLowerCase().contains(_searchQuery))
+                    .toList();
+
+                if (filteredPois.isEmpty) {
+                  return const Center(
+                      child: Text("Aradığınız kriterde mekan bulunamadı.",
+                          style: TextStyle(color: Colors.white54)));
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 8.0),
+                  itemCount: filteredPois.length,
+                  itemBuilder: (context, index) {
+                    final poi = filteredPois[index];
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => POIDetailScreen(poi: poi),
+                          ),
+                        );
+                      },
+                      child: _PoiCard(poi: poi),
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// Kart Tasarımı
 class _PoiCard extends StatelessWidget {
   final POIModel poi;
   const _PoiCard({required this.poi});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 15.0),
-      color: const Color(0xFF1E1E1E),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Resim
-            ClipRRect(
-              borderRadius: BorderRadius.circular(15.0),
-              child: Image.network(
-                poi.resimUrlsi.isNotEmpty 
-                    ? poi.resimUrlsi 
-                    : 'https://ui-avatars.com/api/?name=${poi.ad}&background=random',
-                width: 100,
-                height: 100,
-                fit: BoxFit.cover,
-                errorBuilder: (c, o, s) => Container(
-                  width: 100, height: 100, color: Colors.grey[800], 
-                  child: const Icon(LucideIcons.imageOff, color: Colors.white54),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Resim
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            child: poi.resimUrlsi.isNotEmpty
+                ? Image.network(
+                    poi.resimUrlsi,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, o, s) => _buildPlaceholder(),
+                  )
+                : _buildPlaceholder(),
+          ),
+
+          // İçerik
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        poi.kategori,
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 18),
+                        const SizedBox(width: 4),
+                        Text(
+                          poi.puanOrtalamasi.toStringAsFixed(1),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 12),
+                Text(
+                  poi.ad,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(LucideIcons.mapPin,
+                        color: Colors.white54, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        poi.ilce,
+                        style: const TextStyle(
+                            color: Colors.white54, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white10, height: 24),
+                Text(
+                  poi.aciklama,
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 14, height: 1.4),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            const SizedBox(width: 15.0),
-            // Yazılar
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    poi.ad,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4.0),
-                  Row(
-                    children: [
-                      const Icon(LucideIcons.mapPin, size: 14, color: Colors.redAccent),
-                      const SizedBox(width: 4),
-                      // Modelde district yoksa address'i kullandığımız için burası dolu gelecek
-                      Expanded(child: Text(poi.ilce, style: const TextStyle(color: Colors.white70, fontSize: 13), overflow: TextOverflow.ellipsis)),
-                    ],
-                  ),
-                  const SizedBox(height: 8.0),
-                  Row(
-                    children: [
-                      const Icon(LucideIcons.star, size: 16, color: Colors.amber),
-                      const SizedBox(width: 4),
-                      Text(poi.puanOrtalamasi.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      height: 180,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1a1a2e), Color(0xFF16213e)],
         ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.restaurant, color: Colors.white24, size: 48),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              poi.ad,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

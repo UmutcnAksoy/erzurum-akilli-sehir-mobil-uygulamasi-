@@ -1,17 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// POI (Point of Interest) - Gezilecek Yerler Modeli
 class POIModel {
   final String id;
-  final String ad;            // Firebase: 'name'
-  final String aciklama;      // Firebase: 'description'
-  final String ilce;          // Firebase: 'district' veya 'address'
-  final String kategori;      // Firebase: 'category' veya 'type'
-  final String resimUrlsi;    // Firebase: 'image_url'
-  final int ortalamaSure;     // Firebase: 'visit_duration' veya 'duration'
-  final double puanOrtalamasi;// Firebase: 'rating'
-  final int yorumSayisi;      // Firebase: 'review_count'
-  final String adres;         // Firebase: 'address_detail' veya 'address'
+  final String ad;
+  final String aciklama;
+  final String ilce;
+  final String kategori;
+  final String resimUrlsi;
+  final int ortalamaSure;
+  final double puanOrtalamasi;
+  final int yorumSayisi;
+  final String adres;
+  final double? latitude;
+  final double? longitude;
 
   POIModel({
     required this.id,
@@ -24,14 +25,13 @@ class POIModel {
     required this.puanOrtalamasi,
     required this.yorumSayisi,
     required this.adres,
+    this.latitude,
+    this.longitude,
   });
 
-  // Firestore DocumentSnapshot'tan POIModel objesi oluşturan Factory metodu
   factory POIModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
 
-    // --- GÜVENLİ SAYI DÖNÜŞTÜRÜCÜLER (Hata Önleyici) ---
-    // Veritabanından sayı bazen String ("4.5"), bazen Int (4) gelebilir. Hepsini yönetir.
     double parseDouble(dynamic value) {
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -46,38 +46,27 @@ class POIModel {
       return 0;
     }
 
+    double? lat;
+    double? lng;
+    if (data['location'] is GeoPoint) {
+      final geoPoint = data['location'] as GeoPoint;
+      lat = geoPoint.latitude;
+      lng = geoPoint.longitude;
+    }
+
     return POIModel(
       id: doc.id,
-      
-      // 1. AD (NAME)
-      ad: data['name'] ?? 'İsimsiz Mekan', 
-
-      // 2. AÇIKLAMA (DESCRIPTION)
-      // Açıklama yoksa kategori veya adres bilgisini göstererek boş kalmasını engelleriz.
-      aciklama: data['description'] ?? '${data['category'] ?? ""} - ${data['address'] ?? "Açıklama girilmemiş."}',
-
-      // 3. İLÇE (DISTRICT / ADDRESS)
-      // 'district' alanı yoksa, 'address' alanını kullanır.
-      ilce: data['district'] ?? data['address'] ?? 'Merkez', 
-
-      // 4. KATEGORİ (CATEGORY / TYPE)
-      kategori: data['category'] ?? data['type'] ?? 'Genel',
-
-      // 5. RESİM (IMAGE_URL)
-      resimUrlsi: data['image_url'] ?? '',
-
-      // 6. ADRES DETAYI (ADDRESS_DETAIL / ADDRESS)
-      adres: data['address_detail'] ?? data['address'] ?? 'Adres bilgisi yok.', 
-
-      // 7. SAYISAL DEĞERLER (RATING, DURATION, REVIEW)
-      ortalamaSure: parseInt(data['visit_duration'] ?? data['duration'] ?? 45),
-      puanOrtalamasi: parseDouble(data['rating']),
-      yorumSayisi: parseInt(data['review_count'] ?? 10), 
+      ad: data['name'] ?? data['ad'] ?? 'İsimsiz Mekan',
+      aciklama: data['description'] ?? data['aciklama'] ?? 'Açıklama girilmemiş.',
+      ilce: data['district'] ?? data['ilce'] ?? data['address'] ?? 'Merkez',
+      kategori: data['category'] ?? data['type'] ?? data['kategori'] ?? 'Genel',
+      resimUrlsi: data['image_url'] ?? data['resim_url'] ?? data['resimUrlsi'] ?? '',
+      adres: data['address'] ?? data['address_detail'] ?? data['adres'] ?? 'Adres bilgisi yok.',
+      ortalamaSure: parseInt(data['visit_duration'] ?? data['duration'] ?? data['ortalamaSure'] ?? 45),
+      puanOrtalamasi: parseDouble(data['rating'] ?? data['puanOrtalamasi'] ?? 0.0),
+      yorumSayisi: parseInt(data['review_count'] ?? data['yorumSayisi'] ?? 0),
+      latitude: lat,
+      longitude: lng,
     );
-  }
-
-  @override
-  String toString() {
-    return 'POIModel(Ad: $ad, Kategori: $kategori, Puan: $puanOrtalamasi)';
   }
 }

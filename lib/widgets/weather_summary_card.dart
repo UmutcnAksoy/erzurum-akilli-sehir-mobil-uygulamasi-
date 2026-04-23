@@ -1,66 +1,27 @@
+import 'dart:convert';
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'dart:async'; // Timer için
-import 'package:intl/intl.dart'; // Tarih ve saat formatı için
+import 'package:intl/intl.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 
-// Backend'den gelen hava durumu verilerini tutmak için model sınıfı
 class WeatherData {
   final String sehir;
-  final String sicaklik;
+  final double sicaklik;
   final String durum;
   final String ikon;
-  // Backend bu verileri gönderse bile UI'da kullanmayacağız,
-  // ancak modelde tutmak JSON parse hatasını önler.
-  final String hissedilen;
-  final String nem;
+  final int nem;
+  final double ruzgar;
 
   WeatherData({
     required this.sehir,
     required this.sicaklik,
     required this.durum,
     required this.ikon,
-    required this.hissedilen,
     required this.nem,
+    required this.ruzgar,
   });
-
-  // JSON'dan WeatherData nesnesi oluşturur
-  factory WeatherData.fromJson(Map<String, dynamic> json) {
-    return WeatherData(
-      sehir: json['sehir'] ?? 'Bilinmiyor',
-      sicaklik: json['sicaklik'] ?? '--',
-      durum: json['durum'] ?? 'Veri Yok',
-      ikon: json['ikon'] ?? 'cloud',
-      hissedilen: json['hissedilen'] ?? '--',
-      nem: json['nem'] ?? '--',
-    );
-  }
-}
-
-// Hava durumu ikonlarını Flutter Material ikonlarına eşleştirme fonksiyonu
-IconData getWeatherIcon(String iconName) {
-  switch (iconName) {
-    case 'sun':
-      return Icons.wb_sunny; // Güneşli
-    case 'moon':
-      return Icons.mode_night; // Ay
-    case 'cloud_sun':
-      return Icons.cloud_queue; // Güneşli ve Bulutlu
-    case 'cloud_moon':
-      return Icons.cloud_queue; // Ay ve Bulutlu
-    case 'cloud':
-      return Icons.cloud; // Bulutlu
-    case 'rain':
-      return Icons.umbrella; // Yağmurlu
-    case 'storm':
-      return Icons.thunderstorm; // Fırtınalı
-    case 'snow':
-      return Icons.ac_unit; // Karlı
-    case 'fog':
-      return Icons.foggy; // Sisli
-    default:
-      return Icons.help_outline;
-  }
 }
 
 class WeatherSummaryCard extends StatefulWidget {
@@ -71,32 +32,23 @@ class WeatherSummaryCard extends StatefulWidget {
 }
 
 class _WeatherSummaryCardState extends State<WeatherSummaryCard> {
-  // Backend sunucusunun adresi
-  // Android Emülatör: 10.0.2.2, Gerçek Cihaz: Bilgisayarın IP'si (örn: 192.168.1.35)
-  final String backendUrl = "http://10.0.2.2:8000/hava-durumu";
-
-  Future<WeatherData>? _weatherData;
+  WeatherData? _weatherData;
+  bool _isLoading = true;
+  bool _isError = false;
   Timer? _weatherTimer;
-  Timer? _clockTimer; // YENİ: Saati saniye saniye güncellemek için
-  
+  Timer? _clockTimer;
   String _currentTime = DateFormat('HH:mm').format(DateTime.now());
 
   @override
   void initState() {
     super.initState();
-    
-    // 1. Hava Durumu Verisi: Uygulama açıldığında çek ve periyodik olarak güncelle (5 dakikada bir)
-    _weatherData = fetchWeather();
-    _weatherTimer = Timer.periodic(const Duration(minutes: 5), (Timer t) {
-      if (mounted) {
-        setState(() {
-          _weatherData = fetchWeather();
-        });
-      }
+    _fetchWeather();
+
+    _weatherTimer = Timer.periodic(const Duration(minutes: 10), (t) {
+      if (mounted) _fetchWeather();
     });
 
-    // 2. YENİ EKLENDİ: Saati saniye saniye akıtmak için (1 saniyede bir güncelle)
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (mounted) {
         setState(() {
           _currentTime = DateFormat('HH:mm').format(DateTime.now());
@@ -107,181 +59,218 @@ class _WeatherSummaryCardState extends State<WeatherSummaryCard> {
 
   @override
   void dispose() {
-    _weatherTimer?.cancel(); // Hava durumu zamanlayıcısını temizle
-    _clockTimer?.cancel();   // YENİ: Saat zamanlayıcısını temizle
+    _weatherTimer?.cancel();
+    _clockTimer?.cancel();
     super.dispose();
   }
 
-  Future<WeatherData> fetchWeather() async {
+  Future<String> _getApiKey() async {
     try {
-      final response = await http.get(Uri.parse(backendUrl));
+      final remoteConfig = FirebaseRemoteConfig.instance;
+      await remoteConfig.setConfigSettings(RemoteConfigSettings(
+        fetchTimeout: const Duration(seconds: 10),
+        minimumFetchInterval: const Duration(hours: 1),
+      ));
+      await remoteConfig.fetchAndActivate();
+      final key = remoteConfig.getString('openweather_api_key');
+      if (key.isNotEmpty) return key;
+    } catch (e) {
+      print('❌ Remote Config hatası: $e');
+    }
+    // Fallback
+    return '37d51f7bbe3e032bc37108058022fb35';
+  }
+
+  Future<void> _fetchWeather() async {
+    try {
+      setState(() => _isLoading = true);
+
+      final apiKey = await _getApiKey();
+      final url =
+          "https://api.openweathermap.org/data/2.5/weather?lat=39.9042&lon=41.2677&appid=$apiKey&units=metric&lang=tr";
+
+      print('🌤️ Hava durumu isteği gönderiliyor...');
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
+
+      print('📡 HTTP Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        return WeatherData.fromJson(jsonDecode(response.body));
+        final json = jsonDecode(utf8.decode(response.bodyBytes));
+        final weatherId = json['weather'][0]['id'] as int;
+        final isDay = _isGunduz(json['sys']['sunrise'], json['sys']['sunset']);
+
+        setState(() {
+          _weatherData = WeatherData(
+            sehir: "Erzurum",
+            sicaklik: (json['main']['temp'] as num).toDouble(),
+            durum: _turkceHavaDurumu(weatherId),
+            ikon: _getIcon(weatherId, isDay),
+            nem: json['main']['humidity'] as int,
+            ruzgar: (json['wind']['speed'] as num).toDouble(),
+          );
+          _isLoading = false;
+          _isError = false;
+        });
       } else {
-        return WeatherData(
-          sehir: "Erzurum",
-          sicaklik: '---',
-          durum: 'Veri Hatası',
-          ikon: 'cloud',
-          hissedilen: '---',
-          nem: '---',
-        );
+        print('❌ HTTP Hata: ${response.statusCode}');
+        setState(() { _isLoading = false; _isError = true; });
       }
     } catch (e) {
-      return WeatherData(
-        sehir: "Erzurum",
-        sicaklik: '---',
-        durum: 'Bağlantı Sorunu',
-        ikon: 'cloud',
-        hissedilen: '---',
-        nem: '---',
-      );
+      print('❌ Hava durumu hatası: $e');
+      setState(() { _isLoading = false; _isError = true; });
+    }
+  }
+
+  bool _isGunduz(int sunrise, int sunset) {
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return now >= sunrise && now <= sunset;
+  }
+
+  String _turkceHavaDurumu(int id) {
+    if (id >= 200 && id < 300) return 'Fırtınalı';
+    if (id >= 300 && id < 400) return 'Çiseleyen';
+    if (id >= 500 && id < 600) return 'Yağmurlu';
+    if (id >= 600 && id < 700) return 'Karlı';
+    if (id >= 700 && id < 800) return 'Sisli';
+    if (id == 800) return 'Açık';
+    if (id == 801) return 'Az Bulutlu';
+    if (id == 802) return 'Parçalı Bulutlu';
+    if (id >= 803) return 'Bulutlu';
+    return 'Bilinmiyor';
+  }
+
+  String _getIcon(int id, bool isDay) {
+    if (id >= 200 && id < 300) return 'storm';
+    if (id >= 300 && id < 600) return 'rain';
+    if (id >= 600 && id < 700) return 'snow';
+    if (id >= 700 && id < 800) return 'fog';
+    if (id == 800) return isDay ? 'sun' : 'moon';
+    if (id == 801 || id == 802) return 'cloud_sun';
+    return 'cloud';
+  }
+
+  IconData _getWeatherIcon(String iconName) {
+    switch (iconName) {
+      case 'sun': return Icons.wb_sunny_rounded;
+      case 'moon': return Icons.mode_night_rounded;
+      case 'cloud_sun': return Icons.wb_cloudy_rounded;
+      case 'cloud': return Icons.cloud_rounded;
+      case 'rain': return Icons.beach_access_rounded;
+      case 'storm': return Icons.thunderstorm_rounded;
+      case 'snow': return Icons.ac_unit_rounded;
+      case 'fog': return Icons.cloud_circle_rounded;
+      default: return Icons.wb_cloudy_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<WeatherData>(
-      future: _weatherData,
-      builder: (context, snapshot) {
-        // Veri beklerken yükleniyor ekranı
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingState();
-        } 
-        
-        // Hata oluştuysa veya veri geldiyse
-        final data = snapshot.data ?? 
-            WeatherData(
-                sehir: 'Erzurum', 
-                sicaklik: '--', 
-                durum: 'Hata', 
-                ikon: 'cloud', 
-                hissedilen: '--',
-                nem: '--',
-            );
-        
-        // Ana kartın buzlu cam tasarımı
-        return Container(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(25),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20.0), // İç boşluk
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2), // Hafif şeffaf beyaz arka plan
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                spreadRadius: 2,
-              ),
-            ],
-            border: Border.all(
-              color: Colors.white.withOpacity(0.5), // Buzlu cam çerçevesi
-              width: 1.5,
-            ),
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Üst Satır: Şehir ve Saat
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${data.sehir}, Merkez',
+                  const Text(
+                    "Erzurum, Merkez",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
                   ),
-                  // Sağ Üst: Güncel Saat (Artık saniye saniye akacak)
                   Text(
                     _currentTime,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 18),
                   ),
                 ],
               ),
-              
-              const SizedBox(height: 25), 
-
-              // Orta Satır: Sıcaklık, Durum ve İkon
+              const SizedBox(height: 25),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Sol: Sıcaklık ve Durum
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${data.sicaklik}°C',
+                        _isLoading
+                            ? "--°C"
+                            : _isError
+                                ? "--°C"
+                                : "${_weatherData!.sicaklik.toStringAsFixed(0)}°C",
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 64, // Oldukça büyük ve okunaklı
+                          fontSize: 62,
                           fontWeight: FontWeight.w900,
-                          shadows: [
-                            Shadow(color: Colors.black38, blurRadius: 4),
-                          ],
+                          height: 1.0,
                         ),
                       ),
+                      const SizedBox(height: 5),
                       Text(
-                        data.durum,
+                        _isLoading
+                            ? "Yükleniyor..."
+                            : _isError
+                                ? "Bağlantı Sorunu"
+                                : _weatherData!.durum,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.95),
-                          fontSize: 20, // Yazı boyutunu artırdım
+                          color: _isError ? Colors.redAccent : Colors.white70,
+                          fontSize: 18,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
-                  
-                  // Sağ: İkon
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Icon(
-                      getWeatherIcon(data.ikon),
-                      size: 80, // İkonu büyüttüm
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                  ),
+                  _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Icon(
+                          _getWeatherIcon(
+                              _isError ? 'cloud' : (_weatherData?.ikon ?? 'cloud')),
+                          size: 80,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
                 ],
               ),
-              // Nem ve Hissedilen satırları kaldırılmıştır.
+              if (!_isLoading && !_isError && _weatherData != null) ...[
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _infoChip(Icons.water_drop, "${_weatherData!.nem}%", "Nem"),
+                    _infoChip(Icons.air,
+                        "${_weatherData!.ruzgar.toStringAsFixed(1)} m/s", "Rüzgar"),
+                  ],
+                ),
+              ],
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  // Yükleniyor durumunu gösteren basit bir kart
-  Widget _buildLoadingState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20.0),
-      height: 200, 
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
-      ),
-      child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 16),
-            Text(
-              "Hava Durumu Yükleniyor...",
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-          ],
-        ),
-      ),
+  Widget _infoChip(IconData icon, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white60, size: 20),
+        const SizedBox(height: 4),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(label,
+            style: const TextStyle(color: Colors.white54, fontSize: 11)),
+      ],
     );
   }
 }

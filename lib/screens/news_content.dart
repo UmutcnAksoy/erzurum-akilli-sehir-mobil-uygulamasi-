@@ -2,39 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:google_fonts/google_fonts.dart'; // Tema uyumu için
-
-// ----------------------------------------------------------------------
-// 1. MODELLER (Backend'den gelen JSON yapısına uygun)
-// ----------------------------------------------------------------------
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 class NewsArticle {
   final String title;
   final String description;
   final String url;
   final String imageUrl;
+  final String source;
 
   NewsArticle({
     required this.title,
     required this.description,
     required this.url,
     required this.imageUrl,
+    required this.source,
   });
 
   factory NewsArticle.fromJson(Map<String, dynamic> json) {
     return NewsArticle(
-      // Backend'deki anahtarlar: 'baslik', 'aciklama', 'link', 'gorsel'
-      title: json['baslik'] ?? 'Başlık Yok',
-      description: json['aciklama'] ?? json['kaynak'] ?? 'Detaylar haberin devamında...',
-      url: json['link'] ?? '#',
-      imageUrl: json['gorsel'] ?? 'https://placehold.co/400x300/1E293B/ffffff?text=Erzurum',
+      title: json['title'] ?? 'Başlık Yok',
+      description: json['description'] ?? 'Detaylar haberin devamında...',
+      url: json['url'] ?? '#',
+      imageUrl: json['urlToImage'] ?? '',
+      source: json['source']?['name'] ?? 'Haber',
     );
   }
 }
-
-// ----------------------------------------------------------------------
-// 2. EKRAN (WIDGET)
-// ----------------------------------------------------------------------
 
 class NewsContent extends StatefulWidget {
   const NewsContent({super.key});
@@ -44,9 +38,6 @@ class NewsContent extends StatefulWidget {
 }
 
 class _NewsContentState extends State<NewsContent> {
-  // Backend adresi (Emülatör için 10.0.2.2)
-  final String backendUrl = "http://10.0.2.2:8000/haberler";
-  
   Future<List<NewsArticle>>? _newsData;
 
   @override
@@ -55,220 +46,235 @@ class _NewsContentState extends State<NewsContent> {
     _newsData = fetchNews();
   }
 
-  // ----------------------------------------------------------------------
-  // URL AÇMA FONKSİYONU (Android 11+ Uyumlu)
-  // ----------------------------------------------------------------------
-  Future<void> _launchURL(String url) async {
-    if (url == '#' || url.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bu haberin linki bulunmuyor.')),
-        );
-      }
-      return;
+  Future<String> _getApiKey() async {
+    try {
+      final remoteConfig = FirebaseRemoteConfig.instance;
+      await remoteConfig.setConfigSettings(RemoteConfigSettings(
+        fetchTimeout: const Duration(seconds: 10),
+        minimumFetchInterval: const Duration(hours: 1),
+      ));
+      await remoteConfig.fetchAndActivate();
+      final key = remoteConfig.getString('news_api_key');
+      if (key.isNotEmpty) return key;
+    } catch (e) {
+      print('❌ Remote Config hatası: $e');
     }
+    return '77c434cf9caf4b11bbb1199112c8471c';
+  }
 
+  Future<void> _launchURL(String url) async {
+    if (url == '#' || url.isEmpty) return;
     try {
       final Uri uri = Uri.parse(url);
-      // 'externalApplication' modu, linki uygulamanın içinde değil, Chrome/Tarayıcıda açar.
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Link açılamadı: $url')),
-          );
-        }
+        throw 'Açılamadı';
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata oluştu: $e')),
-        );
+            const SnackBar(content: Text('Haber linki açılamadı.')));
       }
     }
   }
 
-  // ----------------------------------------------------------------------
-  // VERİ ÇEKME FONKSİYONU (DÜZELTİLMİŞ)
-  // ----------------------------------------------------------------------
   Future<List<NewsArticle>> fetchNews() async {
     try {
-      final response = await http.get(Uri.parse(backendUrl));
+      final apiKey = await _getApiKey();
 
-      if (response.statusCode == 200) {
-        // UTF-8 decoding yaparak Türkçe karakter sorununu çözeriz
-        // Backend direkt liste [ ... ] döndüğü için List<dynamic> olarak alıyoruz.
-        final List<dynamic> articlesJson = jsonDecode(utf8.decode(response.bodyBytes));
+      // Erzurum'a özel haberler - birden fazla kaynak dene
+      final urls = [
+        // Türkçe Erzurum haberleri
+        'https://newsapi.org/v2/everything?q=Erzurum&language=tr&sortBy=publishedAt&pageSize=20&apiKey=$apiKey',
+        // İngilizce Erzurum haberleri (Türkçe yetmezse)
+        'https://newsapi.org/v2/everything?q=Erzurum+Turkey&sortBy=publishedAt&pageSize=20&apiKey=$apiKey',
+      ];
 
-        if (articlesJson.isEmpty) {
-          // Backend çalışıyor ama liste boşsa, frontend tarafında yedek gösterelim
-          return _getFrontendDummyNews();
+      for (final url in urls) {
+        print('📰 Haberler çekiliyor: $url');
+        final response = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 10));
+
+        print('📡 HTTP Status: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          final articles = data['articles'] as List<dynamic>;
+
+          final filtered = articles
+              .where((a) =>
+                  a['title'] != null &&
+                  a['title'] != '[Removed]' &&
+                  a['url'] != null &&
+                  // Sadece Erzurum ile ilgili haberleri filtrele
+                  (a['title'].toString().toLowerCase().contains('erzurum') ||
+                   a['description']?.toString().toLowerCase().contains('erzurum') == true))
+              .map((a) => NewsArticle.fromJson(a))
+              .toList();
+
+          if (filtered.isNotEmpty) return filtered;
         }
-
-        // Gelen listeyi NewsArticle objelerine çevir
-        return articlesJson.map((json) => NewsArticle.fromJson(json)).toList();
-      } else {
-        print('Backend Hatası: ${response.statusCode}');
-        return _getFrontendDummyNews(); // Hata varsa yedek göster
       }
+
+      return _getDummyNews();
     } catch (e) {
-      print('Bağlantı Hatası: $e');
-      // Hiç bağlanamazsa (Backend kapalıysa) yine yedek göster ki ekran boş kalmasın
-      return _getFrontendDummyNews();
+      print('❌ Haber bağlantı hatası: $e');
+      return _getDummyNews();
     }
   }
 
-  // Frontend tarafındaki acil durum yedek verileri
-  List<NewsArticle> _getFrontendDummyNews() {
+  List<NewsArticle> _getDummyNews() {
     return [
       NewsArticle(
-        title: "Erzurum'da Kış Turizmi Rekor Kırıyor",
-        description: "Palandöken kayak merkezi bu yıl turist akınına uğradı.",
-        url: "https://www.google.com/search?q=Erzurum+Palandöken",
-        imageUrl: "https://placehold.co/400x300/2a64c4/ffffff?text=PALANDOKEN",
+        title: "Palandöken'de Kayak Sezonu Heyecanı",
+        description: "Erzurum'da kar kalınlığı istenen seviyeye ulaştı.",
+        url: "https://www.google.com/search?q=Erzurum+Palandoken",
+        imageUrl: "",
+        source: "Erzurum Haber",
       ),
       NewsArticle(
-        title: "Tarihi Yakutiye Medresesi Restore Ediliyor",
-        description: "Kültür ve Turizm Bakanlığı yeni projeyi duyurdu.",
-        url: "https://www.google.com/search?q=Yakutiye+Medresesi",
-        imageUrl: "https://placehold.co/400x300/4a7065/ffffff?text=TARIH",
-      ),
-      NewsArticle(
-        title: "Erzurumspor Süper Lig Yolunda",
-        description: "Mavi beyazlı ekip son maçında galip geldi.",
-        url: "https://www.google.com/search?q=Erzurumspor",
-        imageUrl: "https://placehold.co/400x300/0000FF/ffffff?text=SPOR",
+        title: "Erzurum Akıllı Şehir Uygulaması",
+        description: "Uygulama üzerinden tüm ulaşım hatlarına ulaşabilirsiniz.",
+        url: "#",
+        imageUrl: "",
+        source: "Sistem",
       ),
     ];
   }
 
-  // ----------------------------------------------------------------------
-  // ARAYÜZ (UI)
-  // ----------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    // Tema renkleri
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? Colors.white.withOpacity(0.1) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subtitleColor = isDark ? Colors.white54 : Colors.black54;
-
-    // Çentik ve bar boşlukları
-    final double topPadding = MediaQuery.of(context).padding.top + kToolbarHeight + 10;
-    final double bottomPadding = kBottomNavigationBarHeight + 20;
-
     return FutureBuilder<List<NewsArticle>>(
       future: _newsData,
       builder: (context, snapshot) {
-        // 1. Yükleniyor Durumu
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
-        } 
-        
-        // 2. Hata veya Veri Yok Durumu (Yedek fonksiyonumuz olduğu için buraya nadiren düşer)
-        else if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
+          return const Center(
+              child: CircularProgressIndicator(color: Colors.white));
+        }
+
+        final news = snapshot.data ?? [];
+
+        if (news.isEmpty) {
+          return const Center(
             child: Text(
-              "Haberler yüklenemedi.",
-              style: TextStyle(color: textColor),
+              "Haber bulunamadı",
+              style: TextStyle(color: Colors.white54),
             ),
           );
         }
 
-        final news = snapshot.data!;
-
-        // 3. Liste Görünümü
         return ListView.builder(
-          padding: EdgeInsets.only(
-            top: topPadding,
-            bottom: bottomPadding,
-            left: 16.0,
-            right: 16.0,
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 120, 16, 100),
           itemCount: news.length,
           itemBuilder: (context, index) {
             final article = news[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Card(
-                color: cardColor,
-                elevation: 4, // Hafif gölge
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => _launchURL(article.url),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Görsel
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                        child: Image.network(
-                          article.imageUrl,
-                          height: 180, // Görseli biraz daha büyük yaptım
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
+            return Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _launchURL(article.url),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(20)),
+                      child: article.imageUrl.isNotEmpty
+                          ? Image.network(
+                              article.imageUrl,
                               height: 180,
-                              color: Colors.grey[800],
-                              child: const Center(
-                                child: Icon(Icons.image_not_supported, size: 50, color: Colors.white24),
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildPlaceholder(),
+                            )
+                          : _buildPlaceholder(),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.newspaper,
+                                  color: Colors.blueAccent, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                article.source,
+                                style: const TextStyle(
+                                    color: Colors.blueAccent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold),
                               ),
-                            );
-                          },
-                        ),
-                      ),
-                      
-                      // Yazılar
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              article.title,
-                              style: TextStyle(
-                                color: textColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            article.title,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          if (article.description.isNotEmpty)
                             Text(
                               article.description,
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 13),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: subtitleColor,
-                                fontSize: 14,
-                              ),
                             ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text(
-                                  "Habere Git >",
-                                  style: TextStyle(
-                                    color: Colors.blueAccent[100],
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            )
-                          ],
-                        ),
+                          const SizedBox(height: 10),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                "Devamını oku",
+                                style: TextStyle(
+                                    color: Colors.blueAccent, fontSize: 12),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_ios,
+                                  color: Colors.blueAccent, size: 12),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
           },
         );
       },
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      height: 180,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.newspaper, color: Colors.white24, size: 48),
+          SizedBox(height: 8),
+          Text("Erzurum Haberleri",
+              style: TextStyle(color: Colors.white38, fontSize: 14)),
+        ],
+      ),
     );
   }
 }
