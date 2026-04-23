@@ -1,4 +1,4 @@
-# Erzurum Atlası - Akıllı Şehir Rehberi
+# 🏔️ Erzurum Atlası - Akıllı Şehir Rehberi
 
 ![Flutter](https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white)
 ![Firebase](https://img.shields.io/badge/firebase-%23039BE5.svg?style=for-the-badge&logo=firebase)
@@ -14,8 +14,8 @@ Uygulama; kullanıcının anlık konumu, sahip olduğu süre, aktivite tercihler
 
 ###  Proje Ekibi
 * **Ekip Yöneticisi ve Proje Yürütücüsü:** [Umut Can AKSOY](https://github.com/UmutcnAksoy)
-* **Ekip Üyesi:** Sevginur ÖZER
-* **Ekip Üyesi:** [Abdussamed ÇİÇEK] (https://github.com/sameddcicekk)
+* **Ekip Üyesi:** [Sevginur ÖZER](https://github.com/SevginurOzer)
+* **Ekip Üyesi:** [Abdussamed ÇİÇEK](https://github.com/sameddcicekk)
 * **Danışman:** Metin İPKİN
 * **Kurum:** Atatürk Üniversitesi - Yönetim Bilişim Sistemleri
 
