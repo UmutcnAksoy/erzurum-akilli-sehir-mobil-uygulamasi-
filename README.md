@@ -15,7 +15,7 @@ Uygulama; kullanıcının anlık konumu, sahip olduğu süre, aktivite tercihler
 ###  Proje Ekibi
 * **Ekip Yöneticisi ve Proje Yürütücüsü:** [Umut Can AKSOY](https://github.com/UmutcnAksoy)
 * **Ekip Üyesi:** Sevginur ÖZER
-* **Ekip Üyesi:** Abdussamed ÇİÇEK(https://github.com/sameddcicekk)
+* **Ekip Üyesi:** [Abdussamed ÇİÇEK] (https://github.com/sameddcicekk)
 * **Danışman:** Metin İPKİN
 * **Kurum:** Atatürk Üniversitesi - Yönetim Bilişim Sistemleri
 
